@@ -2,8 +2,8 @@ import 'dart:collection';
 
 import 'package:dartsv/dartsv.dart';
 import 'package:dartsv/src/encoding/utils.dart';
-import 'package:dartsv/src/script/OpReturnScriptPubkey.dart';
 import 'package:dartsv/src/signature.dart';
+import 'package:dartsv/src/transaction/data_builder.dart';
 import 'package:dartsv/src/transaction/default_builder.dart';
 import 'package:dartsv/src/transaction/signed_unlock_builder.dart';
 import 'package:dartsv/src/transaction/transaction_input.dart';
@@ -345,9 +345,12 @@ class Transaction{
         return this;
     }
 
-    Transaction addData(String data) {
-        var dataOut =  TransactionOutput();
-        dataOut.script = OpReturnScriptPubkey(data); //FIXME: This needs to move into new ScriptBuilder interface
+    Transaction addData(List<int> data, {DataLockBuilder scriptBuilder = null}) {
+
+        scriptBuilder ??= DataLockBuilder(data) ;
+
+        var dataOut =  TransactionOutput(scriptBuilder: scriptBuilder);
+        dataOut.script = scriptBuilder.getScriptPubkey(); //FIXME: This needs to move into new ScriptBuilder interface
         dataOut.satoshis = BigInt.zero;
 
         _txnOutputs.add(dataOut);
@@ -451,7 +454,7 @@ class Transaction{
 
 
     void signInput( int index, SVPrivateKey privateKey, {sighashType = 0}){
-        if (_txnInputs.length > index + 1){
+        if (index +1 > _txnInputs.length){
             throw TransactionException("Input index out of range. Max index is ${_txnInputs.length + 1}");
         }else if (_txnInputs.length == 0) {
             throw TransactionException( "No Inputs defined. Please add some Transaction Inputs");
@@ -750,7 +753,7 @@ class Transaction{
         }
 
         for (var output in _txnOutputs) {
-            if (output.satoshis < Transaction.DUST_AMOUNT && !(output.script is OpReturnScriptPubkey)) {
+            if (output.satoshis < Transaction.DUST_AMOUNT && !(output.scriptBuilder is DataLockBuilder) ) {
                 throw  TransactionAmountException('You have outputs with spending values below the dust limit');
             }
         }
